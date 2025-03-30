@@ -1,4 +1,3 @@
-
 import { User } from './auth';
 import { encryptionService } from './encryption';
 import { toast } from '@/components/ui/use-toast';
@@ -42,12 +41,12 @@ export const chatService = {
           name: isGroup ? groupName : undefined,
         };
         
-        // Generate encryption keys for the creator
+        // Generate encryption keys for the creator if they don't exist
         if (!this.userKeys.has(creator.id)) {
           this.userKeys.set(creator.id, encryptionService.generateKeyPair());
         }
         
-        // Generate encryption keys for the recipient
+        // Generate encryption keys for the recipient if they don't exist
         if (recipient && !this.userKeys.has(recipient.id)) {
           this.userKeys.set(recipient.id, encryptionService.generateKeyPair());
         }
@@ -98,22 +97,31 @@ export const chatService = {
           return;
         }
         
-        // In a real E2E implementation, we would encrypt the message differently for each recipient
-        // For simplicity, we'll just use one recipient's public key here
-        const recipient = session.participants.find(p => p.id !== sender.id);
-        let encryptedContent = content;
+        // Encrypt the message separately for each recipient
+        // For each recipient, we encrypt the message with their public key
+        const recipientEncryptedMessages = new Map<string, string>();
         
-        if (recipient) {
-          const recipientKeys = this.userKeys.get(recipient.id);
-          if (recipientKeys) {
-            encryptedContent = encryptionService.encryptMessage(content, recipientKeys.publicKey);
+        // In a group chat, we need to encrypt for each member separately
+        for (const participant of session.participants) {
+          if (participant.id !== sender.id) { // Don't encrypt for the sender
+            const recipientKeys = this.userKeys.get(participant.id);
+            if (recipientKeys) {
+              const encrypted = encryptionService.encryptMessage(content, recipientKeys.publicKey);
+              recipientEncryptedMessages.set(participant.id, encrypted);
+            }
           }
         }
         
+        // Store the sender's original content for their own view
+        // But for others, store encrypted versions that only they can decrypt
         const newMessage: Message = {
           id: crypto.randomUUID(),
           senderId: sender.id,
-          content: encryptedContent,
+          // The content is stored as a JSON string with recipient-specific encryptions
+          content: JSON.stringify({
+            original: content, // Visible to the sender
+            encrypted: Object.fromEntries(recipientEncryptedMessages)
+          }),
           timestamp: Date.now(),
           encrypted: true
         };
@@ -151,12 +159,42 @@ export const chatService = {
         
         // Decrypt messages intended for this user
         const decryptedMessages = session.messages.map(message => {
-          if (message.encrypted && message.senderId !== userId) {
-            return {
-              ...message,
-              content: encryptionService.decryptMessage(message.content, userKeys.privateKey),
-              encrypted: false
-            };
+          if (message.encrypted) {
+            try {
+              // Parse the JSON content
+              const content = JSON.parse(message.content);
+              
+              // If the user is the sender, they can see the original content
+              if (message.senderId === userId) {
+                return {
+                  ...message,
+                  content: content.original,
+                  encrypted: false
+                };
+              } 
+              // Otherwise, decrypt the message using their private key
+              else if (content.encrypted && content.encrypted[userId]) {
+                return {
+                  ...message,
+                  content: encryptionService.decryptMessage(content.encrypted[userId], userKeys.privateKey),
+                  encrypted: false
+                };
+              }
+              
+              // Fallback if no encryption found for this user
+              return {
+                ...message,
+                content: "Unable to decrypt this message",
+                encrypted: true
+              };
+            } catch (error) {
+              console.error("Decryption error:", error);
+              return {
+                ...message,
+                content: "Error decrypting message",
+                encrypted: true
+              };
+            }
           }
           return message;
         });
