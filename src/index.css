@@ -93,7 +93,6 @@
 
   body {
     @apply bg-ephemeral-bg text-ephemeral-text font-inter;
-    font-family: 'Inter', sans-serif;
   }
 }
 
