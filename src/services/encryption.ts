@@ -70,7 +70,7 @@ export const encryptionService = {
   },
   
   // Simulate encrypting with a symmetric key (AES equivalent)
-  private simEncrypt(plaintext: string, key: string): string {
+  simEncrypt(plaintext: string, key: string): string {
     // In a real app, this would use actual AES encryption
     const keyChars = key.split('');
     const textChars = plaintext.split('');
@@ -86,7 +86,7 @@ export const encryptionService = {
   },
   
   // Simulate decrypting with a symmetric key
-  private simDecrypt(ciphertext: string, key: string): string {
+  simDecrypt(ciphertext: string, key: string): string {
     try {
       const keyChars = key.split('');
       
