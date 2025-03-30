@@ -30,7 +30,10 @@ const Navbar = () => {
 
   return (
     <nav className="flex items-center justify-between px-6 py-4 bg-ephemeral-dark">
-      <div className="flex items-center gap-2" onClick={() => navigate("/")} style={{ cursor: "pointer" }}>
+      <div 
+        className="flex items-center gap-2 cursor-pointer" 
+        onClick={() => navigate("/")}
+      >
         <MessageCircle className="h-6 w-6 text-ephemeral-green" />
         <span className="text-xl font-semibold text-ephemeral-text">EphemChat</span>
       </div>
