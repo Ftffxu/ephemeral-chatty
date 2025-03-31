@@ -9,44 +9,47 @@ import { useState } from "react";
 import { authService } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { ArrowRight, Lock } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+// Define form validation schema
+const registerSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string()
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
 
 const Register = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (!email || !username || !password) {
-      toast({
-        title: "Registration Failed",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+  // Initialize react-hook-form with zod validation
+  const form = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: "",
+      username: "",
+      password: "",
+      confirmPassword: ""
     }
-    
-    if (password !== confirmPassword) {
-      toast({
-        title: "Registration Failed",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  });
+
+  const onSubmit = async (values: RegisterFormValues) => {    
     try {
       setIsLoading(true);
-      const user = await authService.register(email, username, password);
+      const user = await authService.register(values.email, values.username, values.password);
       
       toast({
         title: "Registration Successful",
-        description: `Welcome, ${username}! Your unique ID is ${user.uniqueId}`,
+        description: `Welcome, ${values.username}! Your unique ID is ${user.uniqueId}`,
       });
       
       navigate("/dashboard");
@@ -80,74 +83,105 @@ const Register = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-ephemeral-text">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="your.email@example.com"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-ephemeral-text">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Choose a username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                  
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Username</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="text"
+                            placeholder="Choose a username"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-ephemeral-text">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Create a secure password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                  
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="Create a secure password"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="text-ephemeral-text">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                  
+                  <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Confirm Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="Confirm your password"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Creating account..." : "Register"}
-                </Button>
-                <div className="text-center mt-4">
-                  <p className="text-ephemeral-muted text-sm">
-                    Already have an account?{" "}
-                    <a 
-                      className="text-ephemeral-green hover:underline cursor-pointer"
-                      onClick={() => navigate("/login")}
-                    >
-                      Login
-                    </a>
-                  </p>
-                </div>
-              </form>
+                  
+                  <Button
+                    type="submit"
+                    className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Creating account..." : "Register"}
+                  </Button>
+                  
+                  <div className="text-center mt-4">
+                    <p className="text-ephemeral-muted text-sm">
+                      Already have an account?{" "}
+                      <a 
+                        className="text-ephemeral-green hover:underline cursor-pointer"
+                        onClick={() => navigate("/login")}
+                      >
+                        Login
+                      </a>
+                    </p>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </div>

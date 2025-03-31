@@ -6,13 +6,19 @@ export interface User {
   email: string;
   username: string;
   uniqueId: string;
+  password: string; // We'll store this for the mock auth system
 }
 
-// This would be replaced with actual backend authentication
+// This is a browser-based database using localStorage
 export const authService = {
-  // In-memory user storage (would be a database in production)
-  users: [] as User[],
+  // Initialize users from localStorage or empty array
+  users: JSON.parse(localStorage.getItem('users') || '[]') as User[],
   currentUser: null as User | null,
+  
+  // Save users to localStorage
+  _saveUsers() {
+    localStorage.setItem('users', JSON.stringify(this.users));
+  },
   
   generateUniqueId(): string {
     // Generate a random 8-character alphanumeric string
@@ -24,7 +30,7 @@ export const authService = {
       // Simulate network delay
       setTimeout(() => {
         // Check if user already exists
-        if (this.users.some(user => user.email === email)) {
+        if (this.users.some(user => user.email.toLowerCase() === email.toLowerCase())) {
           reject(new Error('User with this email already exists'));
           return;
         }
@@ -35,16 +41,22 @@ export const authService = {
           email,
           username,
           uniqueId: this.generateUniqueId(),
+          password // Store password (in a real app would be hashed)
         };
         
         // Store user
         this.users.push(newUser);
-        this.currentUser = newUser;
+        this._saveUsers(); // Save to localStorage
+        
+        // Set current user (but omit password)
+        const userWithoutPassword = { ...newUser };
+        delete userWithoutPassword.password;
+        this.currentUser = userWithoutPassword as User;
         
         // Store in localStorage to persist the session
-        localStorage.setItem('currentUser', JSON.stringify(newUser));
+        localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
         
-        resolve(newUser);
+        resolve(userWithoutPassword as User);
       }, 1000);
     });
   },
@@ -54,7 +66,7 @@ export const authService = {
       // Simulate network delay
       setTimeout(() => {
         // Find user
-        const user = this.users.find(u => u.email === email);
+        const user = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
         
         if (!user) {
           // In a real app, you shouldn't reveal whether an email exists or not
@@ -62,15 +74,23 @@ export const authService = {
           return;
         }
         
-        // Password check would happen here in a real app
+        // Password check
+        if (user.password !== password) {
+          reject(new Error('Invalid credentials'));
+          return;
+        }
+        
+        // Create user without password to store as current user
+        const userWithoutPassword = { ...user };
+        delete userWithoutPassword.password;
         
         // Set current user
-        this.currentUser = user;
+        this.currentUser = userWithoutPassword as User;
         
         // Store in localStorage to persist the session
-        localStorage.setItem('currentUser', JSON.stringify(user));
+        localStorage.setItem('currentUser', JSON.stringify(userWithoutPassword));
         
-        resolve(user);
+        resolve(userWithoutPassword as User);
       }, 1000);
     });
   },
@@ -113,7 +133,14 @@ export const authService = {
     return new Promise(resolve => {
       setTimeout(() => {
         const user = this.users.find(u => u.uniqueId === uniqueId);
-        resolve(user || null);
+        if (user) {
+          // Return user without password
+          const userWithoutPassword = { ...user };
+          delete userWithoutPassword.password;
+          resolve(userWithoutPassword as User);
+        } else {
+          resolve(null);
+        }
       }, 500);
     });
   }

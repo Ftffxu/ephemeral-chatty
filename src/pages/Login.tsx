@@ -9,29 +9,36 @@ import { useState } from "react";
 import { authService } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
 import { Lock } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+// Define form validation schema
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Login = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Basic validation
-    if (!email || !password) {
-      toast({
-        title: "Login Failed",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
+  // Initialize react-hook-form with zod validation
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
     }
-    
+  });
+
+  const onSubmit = async (values: LoginFormValues) => {
     try {
       setIsLoading(true);
-      const user = await authService.login(email, password);
+      const user = await authService.login(values.email, values.password);
       
       toast({
         title: "Login Successful",
@@ -69,50 +76,67 @@ const Login = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-ephemeral-text">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Email</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            placeholder="your.email@example.com"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-ephemeral-text">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                  
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-ephemeral-text">Password</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="password"
+                            placeholder="Enter your password"
+                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Login"}
-                </Button>
-                <div className="text-center mt-4">
-                  <p className="text-ephemeral-muted text-sm">
-                    Don't have an account?{" "}
-                    <a 
-                      className="text-ephemeral-green hover:underline cursor-pointer"
-                      onClick={() => navigate("/register")}
-                    >
-                      Register
-                    </a>
-                  </p>
-                </div>
-              </form>
+                  
+                  <Button
+                    type="submit"
+                    className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Logging in..." : "Login"}
+                  </Button>
+                  
+                  <div className="text-center mt-4">
+                    <p className="text-ephemeral-muted text-sm">
+                      Don't have an account?{" "}
+                      <a 
+                        className="text-ephemeral-green hover:underline cursor-pointer"
+                        onClick={() => navigate("/register")}
+                      >
+                        Register
+                      </a>
+                    </p>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </div>
