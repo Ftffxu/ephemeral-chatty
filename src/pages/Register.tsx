@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 // Define form validation schema
 const registerSchema = z.object({
@@ -51,7 +52,7 @@ const Register = () => {
 
   // OTP form validation schema
   const otpSchema = z.object({
-    otp: z.string().min(6, "OTP must be 6 digits").max(6, "OTP must be 6 digits")
+    otp: z.string().length(6, "OTP must be 6 digits")
   });
 
   type OTPFormValues = z.infer<typeof otpSchema>;
@@ -184,16 +185,23 @@ const Register = () => {
                       control={otpForm.control}
                       name="otp"
                       render={({ field }) => (
-                        <FormItem>
+                        <FormItem className="space-y-4">
                           <FormLabel className="text-ephemeral-text">Verification Code</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="text"
-                              placeholder="Enter 6-digit code"
-                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text text-center text-xl tracking-widest"
+                            <InputOTP
                               maxLength={6}
-                            />
+                              {...field}
+                              className="w-full justify-center gap-2"
+                            >
+                              <InputOTPGroup>
+                                <InputOTPSlot index={0} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                                <InputOTPSlot index={1} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                                <InputOTPSlot index={2} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                                <InputOTPSlot index={3} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                                <InputOTPSlot index={4} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                                <InputOTPSlot index={5} className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text" />
+                              </InputOTPGroup>
+                            </InputOTP>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
