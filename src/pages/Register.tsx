@@ -2,13 +2,12 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import { useState } from "react";
 import { authService } from "@/services/auth";
 import { toast } from "@/components/ui/use-toast";
-import { ArrowRight, Lock } from "lucide-react";
+import { ArrowRight, Lock, Mail } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import * as z from "zod";
@@ -30,6 +29,14 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [email, setEmail] = useState("");
+  const [pendingUser, setPendingUser] = useState<{
+    email: string;
+    username: string;
+    password: string;
+    maskedEmail: string;
+  } | null>(null);
 
   // Initialize react-hook-form with zod validation
   const form = useForm<RegisterFormValues>({
@@ -42,21 +49,99 @@ const Register = () => {
     }
   });
 
+  // OTP form validation schema
+  const otpSchema = z.object({
+    otp: z.string().min(6, "OTP must be 6 digits").max(6, "OTP must be 6 digits")
+  });
+
+  type OTPFormValues = z.infer<typeof otpSchema>;
+
+  const otpForm = useForm<OTPFormValues>({
+    resolver: zodResolver(otpSchema),
+    defaultValues: {
+      otp: ""
+    }
+  });
+
   const onSubmit = async (values: RegisterFormValues) => {    
     try {
       setIsLoading(true);
-      const user = await authService.register(values.email, values.username, values.password);
+      const maskedEmail = await authService.startRegistration(
+        values.email,
+        values.username,
+        values.password
+      );
+      
+      setPendingUser({
+        email: values.email,
+        username: values.username,
+        password: values.password,
+        maskedEmail
+      });
+      
+      setShowOTPVerification(true);
+      
+      toast({
+        title: "OTP Sent",
+        description: `We've sent a verification code to ${maskedEmail}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description: (error as Error).message || "An error occurred during registration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onOTPSubmit = async (values: OTPFormValues) => {
+    if (!pendingUser) {
+      toast({
+        title: "Error",
+        description: "Registration information missing. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const user = await authService.verifyOTP(pendingUser.email, values.otp);
       
       toast({
         title: "Registration Successful",
-        description: `Welcome, ${values.username}! Your unique ID is ${user.uniqueId}`,
+        description: `Welcome, ${user.username}! Your unique ID is ${user.uniqueId}`,
       });
       
       navigate("/dashboard");
     } catch (error) {
       toast({
-        title: "Registration Failed",
-        description: (error as Error).message || "An error occurred during registration",
+        title: "Verification Failed",
+        description: (error as Error).message || "Invalid or expired OTP",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (!pendingUser) return;
+    
+    try {
+      setIsLoading(true);
+      await authService.resendOTP(pendingUser.email);
+      
+      toast({
+        title: "OTP Resent",
+        description: `We've sent a new verification code to ${pendingUser.maskedEmail}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to Resend OTP",
+        description: (error as Error).message || "An error occurred",
         variant: "destructive",
       });
     } finally {
@@ -74,114 +159,169 @@ const Register = () => {
             <CardHeader className="space-y-1 text-center">
               <div className="flex justify-center mb-2">
                 <div className="w-12 h-12 rounded-full bg-ephemeral-purple/20 flex items-center justify-center">
-                  <Lock className="h-6 w-6 text-ephemeral-purple" />
+                  {showOTPVerification ? (
+                    <Mail className="h-6 w-6 text-ephemeral-purple" />
+                  ) : (
+                    <Lock className="h-6 w-6 text-ephemeral-purple" />
+                  )}
                 </div>
               </div>
-              <CardTitle className="text-2xl text-ephemeral-text">Create an account</CardTitle>
+              <CardTitle className="text-2xl text-ephemeral-text">
+                {showOTPVerification ? "Verify Your Email" : "Create an account"}
+              </CardTitle>
               <CardDescription className="text-ephemeral-muted">
-                Enter your details below to create your secure account
+                {showOTPVerification 
+                  ? `Enter the verification code sent to ${pendingUser?.maskedEmail}`
+                  : "Enter your details below to create your secure account"
+                }
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-ephemeral-text">Email</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="email"
-                            placeholder="your.email@example.com"
-                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-ephemeral-text">Username</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="text"
-                            placeholder="Choose a username"
-                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-ephemeral-text">Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Create a secure password"
-                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-ephemeral-text">Confirm Password</FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder="Confirm your password"
-                            className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button
-                    type="submit"
-                    className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Creating account..." : "Register"}
-                  </Button>
-                  
-                  <div className="text-center mt-4">
-                    <p className="text-ephemeral-muted text-sm">
-                      Already have an account?{" "}
-                      <a 
-                        className="text-ephemeral-green hover:underline cursor-pointer"
-                        onClick={() => navigate("/login")}
-                      >
-                        Login
-                      </a>
-                    </p>
-                  </div>
-                </form>
-              </Form>
+              {showOTPVerification ? (
+                <Form {...otpForm}>
+                  <form onSubmit={otpForm.handleSubmit(onOTPSubmit)} className="space-y-4">
+                    <FormField
+                      control={otpForm.control}
+                      name="otp"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ephemeral-text">Verification Code</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="text"
+                              placeholder="Enter 6-digit code"
+                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text text-center text-xl tracking-widest"
+                              maxLength={6}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button
+                      type="submit"
+                      className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Verifying..." : "Verify & Complete Registration"}
+                    </Button>
+                    
+                    <div className="text-center mt-4">
+                      <p className="text-ephemeral-muted text-sm">
+                        Didn't receive the code?{" "}
+                        <a 
+                          className="text-ephemeral-green hover:underline cursor-pointer"
+                          onClick={handleResendOTP}
+                        >
+                          Resend
+                        </a>
+                      </p>
+                    </div>
+                  </form>
+                </Form>
+              ) : (
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ephemeral-text">Email</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="email"
+                              placeholder="your.email@example.com"
+                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ephemeral-text">Username</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="text"
+                              placeholder="Choose a username"
+                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ephemeral-text">Password</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="Create a secure password"
+                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ephemeral-text">Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="password"
+                              placeholder="Confirm your password"
+                              className="bg-ephemeral-bg border-ephemeral-purple/30 text-ephemeral-text"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button
+                      type="submit"
+                      className="w-full bg-ephemeral-purple hover:bg-opacity-90 text-white"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? "Sending verification..." : "Continue to Verification"}
+                    </Button>
+                    
+                    <div className="text-center mt-4">
+                      <p className="text-ephemeral-muted text-sm">
+                        Already have an account?{" "}
+                        <a 
+                          className="text-ephemeral-green hover:underline cursor-pointer"
+                          onClick={() => navigate("/login")}
+                        >
+                          Login
+                        </a>
+                      </p>
+                    </div>
+                  </form>
+                </Form>
+              )}
             </CardContent>
           </Card>
         </div>
